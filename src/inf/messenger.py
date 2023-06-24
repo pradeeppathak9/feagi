@@ -59,8 +59,7 @@ class PubSub:
         
     def destroy(self):
         self.context.destroy()
-        
-        
+
 class Pub(PubSub):
     
     def __init__(self, address, bind=True):

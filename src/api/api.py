@@ -72,7 +72,7 @@ app = FastAPI(
 
 favicon_path = settings.favicon_path
 
-api_queue = Queue()
+
 
 ORIGINS = settings.origins
 
@@ -84,15 +84,14 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+api_queue = Queue()
 
-def kickstart_feagi_thread():
+@app.on_event("startup")
+async def kickstart_feagi_thread():
     print("<>--" * 20)
     print("Starting FEAGI thread..")
     runtime_data.feagi_thread = Thread(target=feagi.start_feagi, args=(api_queue,))
     runtime_data.feagi_thread.start()
-
-
-kickstart_feagi_thread()
 
 
 class Launch(BaseModel):
@@ -1797,7 +1796,7 @@ async def agent_list(response: Response):
         
 
 @app.api_route("/v1/agent/properties", methods=['GET'], tags=["Peripheral Nervous System"])
-async def agent_properties(agent_id: str, response: Response):
+async def agent_properties(agent_id: str, agent_type:str, response: Response):
     try:
         print("agent_id", agent_id)
         print("agent_registry", runtime_data.agent_registry)
@@ -1805,8 +1804,7 @@ async def agent_properties(agent_id: str, response: Response):
         if agent_id in runtime_data.agent_registry:
             agent_info["agent_type"] = runtime_data.agent_registry[agent_id]["agent_type"]
             agent_info["agent_ip"] = runtime_data.agent_registry[agent_id]["agent_ip"]
-            agent_info["agent_data_port"] = runtime_data.agent_registry[agent_id]["agent_data_port"]
-            agent_info["agent_router_address"] = runtime_data.agent_registry[agent_id]["agent_router_address"]
+            agent_info["agent_topic"] = runtime_data.agent_registry[agent_id]["agent_topic"]
             response.status_code = status.HTTP_200_OK
             return agent_info
         else:
@@ -1816,36 +1814,27 @@ async def agent_properties(agent_id: str, response: Response):
         print("API Error:", e, traceback.print_exc)
 
 
+from uuid import uuid4
+
+
+
+
 @app.api_route("/v1/agent/register", methods=['POST'], tags=["Peripheral Nervous System"])
-async def agent_registration(request: Request, agent_type: str, agent_id: str, agent_ip: str, agent_data_port: int,
-                             response: Response):
+async def agent_registration(request: Request, agent_type: str, agent_id: str, response: Response):
     try:
         if agent_id not in runtime_data.agent_registry:
             # Add new agent to the registry
             runtime_data.agent_registry[agent_id] = {}
-        runtime_data.agent_registry[agent_id]["agent_type"] = agent_type
-        runtime_data.agent_registry[agent_id]["agent_ip"] = agent_ip
-        runtime_data.agent_registry[agent_id]["agent_data_port"] = agent_data_port
-        print(f"AGENT Details -- {agent_id} -- {agent_ip} -- {agent_type} -- {agent_data_port}")
-        print(f"Client IP ------------------------- {request.client.host}")
-        runtime_data.agent_registry[agent_id]["agent_ip"] = request.client.host
-
-        # Create the needed ZMQ listener for new agent
-        if agent_type == 'monitor':
-            # FEAGI will connect to remote ZMQ for messages
-            agent_router_address = "tcp://" + request.client.host + ':' + str(agent_data_port)
-            runtime_data.agent_registry[agent_id]["agent_router_address"] = agent_router_address
-            runtime_data.agent_registry[agent_id]["listener"] = Sub(address=agent_router_address)
+            runtime_data.agent_registry[agent_id]["agent_type"] = agent_type
+            runtime_data.agent_registry[agent_id]["agent_ip"] = request.client.host
+            agent_topic = f"{agent_type}.{uuid4().hex[:10]}"
+            runtime_data.agent_registry[agent_id]["agent_topic"] = agent_topic
+            runtime_data.agent_registry[agent_id]["agent_topic"] = agent_topic
+            print("New agent has been successfully registered:", runtime_data.agent_registry[agent_id])
         else:
-            agent_router_address = f"tcp://*:{str(agent_data_port)}"
-            runtime_data.agent_registry[agent_id]["agent_router_address"] = agent_router_address
-            # FEAGI will open output_data_port for Agents to connect for messages
-            if 'listener' not in runtime_data.agent_registry[agent_id]:
-                runtime_data.agent_registry[agent_id]["listener"] = Sub(address=agent_router_address, bind=True)
-
-        print("New agent has been successfully registered:", runtime_data.agent_registry[agent_id])
+            print("Agent already registered:", runtime_data.agent_registry[agent_id])
         response.status_code = status.HTTP_200_OK
-        return True
+        return runtime_data.agent_registry[agent_id]
     except Exception as e:
         print("API Error:", e, traceback.print_exc())
         print("Error during agent registration.:", agent_id)

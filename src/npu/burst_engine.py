@@ -314,12 +314,20 @@ def burst_manager():
             runtime_data.influxdb.insert_burst_checkpoints(connectome_path, runtime_data.burst_count)
 
     def init_burst_pub():
-        # Initialize a broadcaster
+        # Initialize a publisher
         if runtime_data.parameters['Sockets']['feagi_opu_port'] is None:
             runtime_data.parameters['Sockets']['feagi_opu_port'] = "3000"  # Default port
-        burst_engine_pub_address = 'tcp://0.0.0.0:' + runtime_data.parameters['Sockets']['feagi_opu_port']
-        runtime_data.burst_publisher = Pub(address=burst_engine_pub_address)
+        burst_engine_pub_address = f"tcp://*:{runtime_data.parameters['Sockets']['feagi_opu_port']}"
+        runtime_data.burst_publisher = Pub(address=burst_engine_pub_address, bind=True)
         print("Burst publisher has been initialized @ ", burst_engine_pub_address)
+
+    def init_burst_sub():
+        # Initialize feagi subscriber
+        if runtime_data.parameters['Sockets']['feagi_in_port'] is None:
+            runtime_data.parameters['Sockets']['feagi_in_port'] = "3001"  # Default port
+        burst_engine_sub_address = f"tcp://*:{runtime_data.parameters['Sockets']['feagi_in_port']}"
+        runtime_data.burst_subscriber = Sub(address=burst_engine_sub_address, bind=True)
+        print("Burst subscriber has been initialized @ ", burst_engine_sub_address)
 
     def controller_handshake():
         broadcast_message = {}
@@ -480,7 +488,6 @@ def burst_manager():
             except Exception as e:
                 print("Error during processing beacon publication!", e)
             runtime_data.beacon_flag = False
-
         if not runtime_data.api_queue:
             pass
         elif runtime_data.api_queue.empty():
@@ -601,6 +608,7 @@ def burst_manager():
     init_burst_engine()
 
     init_burst_pub()
+    init_burst_sub()
 
     # todo: need to figure how to incorporate FCL injection
     # feeder = Feeder()

@@ -19,10 +19,11 @@ limitations under the License.
 feagi_settings = {
     "feagi_host": "127.0.0.1",
     "feagi_api_port": "8000",
+    "feagi_in_port": "3000",
+    "feagi_opu_port": "3001",
 }
 
 agent_settings = {
-    "agent_data_port": "40010",
     "agent_id": "camera_1",
     "agent_type": "embodiment",
     'TTL': 2,
@@ -47,4 +48,8 @@ capabilities = {
     }
 }
 
-message_to_feagi = {"data": {}}
+message_to_feagi = {
+    "agent_id": "camera_1",
+    "agent_type": "embodiment",
+    "data": {}
+}
